@@ -8,7 +8,7 @@ create table `user` (
     status varchar(50),
     -- active, inactive
     role varchar(50),
-    --  moderator, civilian, werevolf, vampire
+    --  moderator, villager, werevolf, vampire, dead
     main_vampire boolean,
     main_werevolf boolean,
     password varchar(255),
@@ -21,6 +21,7 @@ create table game (
     id int not null auto_increment,
     name varchar(255),
     password varchar(255),
+    status varchar(10), -- started, finished
     description text,
     primary key(id)
 );
@@ -40,6 +41,7 @@ create table game_round(
     id int not null auto_increment,
     game_id int,
     round_number int,
+    daynight varchar(10),
     primary key(id)
 );
 
@@ -88,4 +90,11 @@ create table game_round_winner(
     game_round_winner_id int,
     user_id int,
     primary key(game_round_winner_id, user_id)
+);
+drop table if exists game_round_vote;
+create table game_round_vote(
+    game_round_id int,
+    user_id int,
+    vote_user_id int,
+    primary key(game_round_id, user_id)
 );

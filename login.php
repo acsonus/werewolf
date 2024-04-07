@@ -6,7 +6,9 @@ require_once ("functions.php");
 if (isset($_POST['username']) && isset($_POST['password'])) {
     $username = $_POST['username'];
     $password = $_POST['password'];
+    session_regenerate_id();
     if (login($username, $password)) {
+
         header("location:home.php");
     } else {
         echo 'Invalid username or password';

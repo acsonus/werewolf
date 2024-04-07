@@ -1,10 +1,11 @@
 <?php
 require_once ("functions.php");
-if (isset($_POST['username']) && isset($_POST['password']) && isset($_POST['nickname'])) {
+if (isset($_POST['username']) && isset($_POST['password']) && isset($_POST['nickname']) && isset($_POST['role'])) {
     $username = $_POST['username'];
     $password = $_POST['password'];
     $nickname = $_POST['nickname'];
-    if (register($username, $password, $nickname)) {
+    $role = $_POST['role'];
+    if (register($username, $password, $nickname, $role)) {
         header("location:login.php");
     } else {
         echo 'Invalid username or password';
@@ -32,6 +33,13 @@ if (isset($_POST['username']) && isset($_POST['password']) && isset($_POST['nick
         <br>
         <label for="nickname">Nickname:</label>
         <input type="text" name="nickname" id="nickname" required>
+        <br>
+        <label for="role">Select role:</label>
+        <select name="role" id="role" required>
+            <option value="">Choose: </option>
+            <option value="moderator">moderator</option>
+            <option value="villager">villager</option>
+        </select>
         <br>
         <input type="button" value="Register" onclick="javascript:validateForm()">
     </form>
