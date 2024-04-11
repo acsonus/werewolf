@@ -21,7 +21,7 @@ create table game (
     id int not null auto_increment,
     name varchar(255),
     password varchar(255),
-    status varchar(10), -- started, finished
+    status varchar(10), -- created, started, finished
     description text,
     primary key(id)
 );
@@ -58,6 +58,7 @@ drop table if exists game_round_protected;
 
 create table game_round_protected(
     game_round_protected_id int,
+    game_round_id int,
     user_id int,
     protected_by_werevolf boolean,
     protected_by_vampire boolean,
@@ -68,6 +69,7 @@ drop table if exists game_round_bitten;
 
 create table game_round_bitten(
     game_round_bitten_id int,
+    game_round_id int,
     user_id int,
     bitten_by_werevolf boolean,
     bitten_by_vampire boolean,

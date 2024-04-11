@@ -3,18 +3,24 @@ require_once ("functions.php");
 if (session_status() == PHP_SESSION_NONE) {
     session_start();
 }
-//this part describes behaviour for moderator
+//this part describes how moderator creates the game
 if ($_SESSION['role'] == "moderator" && isset($_POST['gameName']) && isset($_POST['gamePassword'])) {
     if (isset($_POST['gameName']) && isset($_POST['gamePassword'])) {
         $gameName = $_POST['gameName'];
         $gamePassword = $_POST['gamePassword'];
         $user_id = $_SESSION["user_id"];
-        createGame($gameName, $gamePassword, $user_id);
+        if (isset($_POST['gameDescription'])){
+            $description = $_POST['gameDescription'];
+        }
+        else {
+            $description = "";
+        }
+        createGame($gameName, $gamePassword, $user_id,$description);
         header("location:home.php");
     }
 }
 
-
+// this part describes how player joins the game
 if (isset($_POST['avaliableGames']) && isset($_POST['gamePassword']) && isset($_POST['mode']) && $_POST['mode'] == "join") {
     $game_id = $_POST['avaliableGames'];
     $gamePassword = $_POST['gamePassword'];
@@ -32,7 +38,7 @@ if (isset($_POST['avaliableGames']) && isset($_POST['gamePassword']) && isset($_
     }
 
 }
-// condition for leaving the game
+// this part describes how player leaves the game
 if (isset($_POST['decision']) && $_POST['decision'] == "leave") {
     $user_id = $_SESSION["user_id"];
     $game_id = $_SESSION["curent_game_id"];
@@ -40,7 +46,6 @@ if (isset($_POST['decision']) && $_POST['decision'] == "leave") {
     $_SESSION["curent_game_id"] = null;
     header("location:home.php");
 }
-// this part describes behaviour for player
 ?>
 
 <html>
@@ -51,7 +56,7 @@ if (isset($_POST['decision']) && $_POST['decision'] == "leave") {
 </head>
 
 <body>
-    <!-- this part describes the game from moderator site-->
+    <!-- this part describes form for moderator-->
     <?php
 
     if ($_SESSION['role'] == "moderator" && isset($_GET['mode']) && $_GET['mode'] == "create") {
@@ -65,10 +70,14 @@ if (isset($_POST['decision']) && $_POST['decision'] == "leave") {
                 <p>Game password </p>
                 <input type="password" name="gamePassword" id="gamePassword" required>
             </div>
+            <div>
+                <p>Description:</p>
+                <textarea name="gameDescription" id="gameDescription"></textarea> 
+            </div>
             <input type="submit" value="Create Game">
         </form>
     <?php }
-
+    // this part describes the game from the players site 
     if (isset($_GET['mode']) && $_GET['mode'] == "join") {
 
         ?>
@@ -93,6 +102,7 @@ if (isset($_POST['decision']) && $_POST['decision'] == "leave") {
         </form>
 
     <?php }
+    // this part describes a situation when player wants to leave the game
     if (isset($_GET['mode']) && $_GET['mode'] == "leave") {
         ?>
         <p>You want to leave the game?</p>

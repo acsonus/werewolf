@@ -28,13 +28,23 @@ if (isset($_SESSION['curent_game_id']) && $_SESSION['curent_game_id'] != null) {
     if ($result->num_rows > 0) {
         $row = $result->fetch_assoc();
         $gameStatus = $row['status'];
+        $_SESSION['game_status'] = $gameStatus;
     } else {
         echo "<p>problem loading game status</p>";
     }
 }
 
-//store all session players
+// update $_SESSION['game_status'] session variable
 if (isset($_SESSION['curent_game_id']) && $_SESSION['curent_game_id'] != null) {
+    $result = $conn->query("SELECT status FROM game WHERE id = " . $_SESSION['curent_game_id']);
+
+    if ($row = $result->fetch_assoc()) {
+        $_SESSION['game_status'] = $row['status'];
+    }
+}
+
+//store all session players
+if (isset($_SESSION['curent_game_id']) && $_SESSION['curent_game_id'] != null && $_SESSION['game_status'] == 'started') {
     $result = $conn->query("SELECT user.name, user.role, user.nickname 
                             from user 
                             inner join user_game on user.id = user_game.user_id 
@@ -48,6 +58,17 @@ if (isset($_SESSION['curent_game_id']) && $_SESSION['curent_game_id'] != null) {
     } else {
         echo "<p>problem loading players</p>";
     }
+
+    // get current game round
+    $conn->query("select max(game_round_id) from  game_round  where  game_id=" . $_SESSION['curent_game_id']);
+    if ($result->num_rows > 0) {
+        $row = $result->fetch_assoc();
+        $_SESSION['game_round_id'] = $row['game_round_id'];
+    } else {
+        echo "problem loading game round<br>";
+        //error_log('Error: ' . $sql . '<br>' . $conn->error);
+    }
+
     //get daynight
     $query = "SELECT daynight,round_number
                             from game_round 
@@ -64,13 +85,33 @@ if (isset($_SESSION['curent_game_id']) && $_SESSION['curent_game_id'] != null) {
 }
 //start the game 
 if (isset($_GET['mode']) && ($_GET['mode'] == 'start_game')) {
-    $//conn->query("UPDATE game SET status = 'active' WHERE id = " . $_SESSION['curent_game_id']);
-        $conn->query("INSERT INTO game_round (game_id,daynight,round_number) VALUES (" . $_SESSION['curent_game_id'] . ",'day',1)");
+    //conn->query("UPDATE game SET status = 'active' WHERE id = " . $_SESSION['curent_game_id']);
+    $conn->query("UPDATE game SET status = 'started' WHERE id = " . $_SESSION['curent_game_id']);
+    $conn->query("INSERT INTO game_round (game_id,daynight,round_number) VALUES (" . $_SESSION['curent_game_id'] . ",'night',1)");
+    header("location:home.php");
+}
+// set main vampire or werewolf
+if (isset($_GET['user_id']) && isset($_GET['set_main']) && ($_GET['set_main'] == 'vampire' || $_GET['set_main'] == 'werewolf')) {
+    $mainRole = $_GET['set_main'];
+    $conn->query("UPDATE user SET role = '" . $role . "' WHERE id = " . $_GET['user_id']);
+    header("location:home.php");
+}
+// change daynight by moderator 
+if ($_SESSION["role"]=="moderator" && isset($_GET['mode']) && ($_GET['mode'] == 'change_daynight')) {
+    switchDayNight($_SESSION['curent_game_id'],$_SESSION['current_game_round']);
+    header("location:home.php");
+}
+//change round by moderator
+if ($_SESSION["role"]=="moderator" && isset($_GET['mode']) && ($_GET['mode'] == 'change_round')) {
+    $round = getMaxGameRound($_SESSION["curent_game_id"])+1;
+    $conn->query("INSERT INTO game_round (game_id,daynight,round_number) VALUES (" . $_SESSION['curent_game_id'] . ",'night',$round)");
     header("location:home.php");
 }
 
 
-//check current game 
+
+
+//leave current game
 if (isset($_GET['mode']) && ($_GET['mode'] == 'leave')) {
     $_SESSION['curent_game_id'] = null;
     $conn->query("DELETE FROM user_game WHERE user_id = " . $_SESSION['user_id']);
@@ -111,7 +152,6 @@ if (isset($_GET['mode']) && ($_GET['mode'] == 'leave')) {
         }
 
     }
-
     ?>
 
 
@@ -132,12 +172,30 @@ if (isset($_GET['mode']) && ($_GET['mode'] == 'leave')) {
             <ul>
                 <?php foreach ($_SESSION['players'] as $player) { ?>
                     <li>
-                        <?php echo $player['nickname'] . ' (' . $player['role'] . ')'; ?>
+                        <?php echo $player['nickname'];
+                        if ($_SESSION['role'] == 'moderator')
+                            echo ' ( ' . $player['role'] . ')';
+                        if ($_SESSION['daynight'] == 'night' && ($player['role'] == 'vampire' || $player['role'] == 'werewolf') && isset($_SESSION["current_game_round"]))
+                            echo '<a href=bite.php?bite_id=' . $player['id'] . '&current_game_round=' . $_SESSION["current_game_round"] . '>Bite</a>';
+                        if ($_SESSION['daynight'] == 'day' && ($player['role'] != 'moderator') && isset($_SESSION["current_game_round"]))
+                            echo '<a href=vote.php?vote_id=' . $player['id'] . '&current_game_round=' . $_SESSION["current_game_round"] . '>Vote</a>';
+                        if ($_SESSION['daynight'] == 'night' && ($player['role'] == 'vampire' || $player['role'] == 'werewolf') && isset($_SESSION["current_game_round"])) {
+                            echo '<a href=protect.php?protect_id=' . $player['id'] . '&current_game_round=' . $_SESSION["current_game_round"] . '>Protect</a>';
+                        }
+                        if ($_SESSION['role'] == 'moderator' && $player['role'] == 'villager' && isset($_SESSION["current_game_round"])) {
+                            echo '<a href=home.php?set_main=vampire&user_id=' . $player['id'] . '>Set main</a>';
+                        }
+                        ?>
                     </li>
                 <?php } ?>
             </ul>
         <?php } else { ?>
             <p> No players in the game</p>
+        <?php } ?>
+ <!-- this section is for moderator. here moderator can change day and night and also can change round number-->
+        <?php if ($_SESSION['role'] == 'moderator') { ?>
+           <a href="home.php?mode=change_daynight">Switch to <?php if ($_SESSION['daynight'] == "night") echo "day"; else echo "night";?></a>
+            <a href="home.php?mode=change_round">Change Round to <?php echo getMaxGameRound($_SESSION["curent_game_id"])+1; ?></a>
         <?php } ?>
     <?php } else { ?>
         <a href="game.php?mode=join">Join Game</a>
@@ -145,8 +203,8 @@ if (isset($_GET['mode']) && ($_GET['mode'] == 'leave')) {
     <?php if ($_SESSION['role'] == 'moderator' && (!isset($_SESSION['curent_game_id']))) { ?>
         <a href="game.php?mode=create">Create Game</a>
     <?php } ?>
-    <?php if ($_SESSION['role'] == 'moderator' && (!isset($_SESSION['curent_game_id']))) { ?>
-        <a href="game.php?mode=start_game">Start Game</a>
+    <?php if ($_SESSION['role'] == 'moderator' && isset($_SESSION['curent_game_id']) && $_SESSION['game_status'] == 'created') { ?>
+        <a href="home.php?mode=start_game">Start Game</a>
     <?php } ?>
     <a href="logout.php">Logout</a>
 

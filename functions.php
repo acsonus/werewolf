@@ -49,7 +49,7 @@ function loadAvaliableGames()
     }
 
 }
-function createGame($name, $password, $moderatorid)
+function createGame($name, $password, $moderatorid, $description)
 {
     global $conn;
     $passwordHash = password_hash($password, PASSWORD_ARGON2I);
@@ -57,11 +57,7 @@ function createGame($name, $password, $moderatorid)
     $st = $conn->query("select ifnull(max(id)+1,1) as id from game");
     if ($row = $st->fetch_assoc()) {
         $id = $row["id"];
-        $sql = "INSERT INTO game (id,name, password) VALUES ($id,'$name', '$passwordHash')";
-        if ($conn->query($sql) === false) {
-            error_log('Error: ' . $conn->error);
-        }
-        $sql = "INSERT INTO user_game (user_id, game_id,) VALUES ($moderatorid, $id)";
+        $sql = "INSERT INTO game (id,name, password,status) VALUES ($id,'$name', '$passwordHash','created')";
         if ($conn->query($sql) === false) {
             error_log('Error: ' . $conn->error);
         }
@@ -183,6 +179,59 @@ function vote($gameroundId, $user_id, $vote_user_id)
         return false;
     }
 }
+function calculateResults($gameId, $roundId, $daynight)
+{
+    global $conn;
+    // for day round
+    if ($daynight == "day") {
+        $sql = "SELECT vote_user_id, count(vote_user_id) as votes FROM game_round_vote WHERE game_round_id = $roundId GROUP BY vote_user_id ORDER BY votes DESC LIMIT 1";
+        $result = $conn->query($sql);
+        if ($result->num_rows > 0) {
+            $row = $result->fetch_assoc();
+            $votedId = $row["vote_user_id"];
+            $votedRoleSql = "SELECT role,nickname FROM user WHERE id = $votedId";
+            $votedRoleResult = $conn->query($votedRoleSql);
+            if ($votedRoleResultRow = $votedRoleResult->fetch_assoc()) {
+                $votedRole = $votedRoleResultRow["role"];
+                $votedNickName = $votedRoleResultRow["nickname"];
+                if ($votedRole == "werewolf" || $votedRole == "vampire") {
+                    $sql = "UPDATE user SET role = 'dead' WHERE id = $votedId";
+                    if ($conn->query($sql) === true) {
+                        return "Tonight you killed a $" . $votedRole . " " . $votedNickName . "!";
+                    } else {
+                        return "Nothing happened";
+                    }
+                }
+            }
+        }
+        // for night round
+        if ($daynight == "night") {
+            $sql = "SELECT vote_user_id, count(vote_user_id) as votes FROM game_round_vote WHERE game_round_id = $roundId GROUP BY vote_user_id ORDER BY votes DESC LIMIT 1";
+            $result = $conn->query($sql);
+            if ($result->num_rows > 0) {
+                $row = $result->fetch_assoc();
+                $votedId = $row["vote_user_id"];
+                $votedRoleSql = "SELECT role,nickname FROM user WHERE id = $votedId";
+                $votedRoleResult = $conn->query($votedRoleSql);
+                if ($votedRoleResultRow = $votedRoleResult->fetch_assoc()) {
+                    $votedRole = $votedRoleResultRow["role"];
+                    $votedNickName = $votedRoleResultRow["nickname"];
+                    if ($votedRole == "villager") {
+                        $sql = "UPDATE user SET role = 'dead' WHERE id = $votedId";
+                        if ($conn->query($sql) === true) {
+                            return "Tonight you killed a villager " . $votedNickName . "!";
+                        } else {
+                            return "Nothing happened";
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+
 
 function newRound($gameId)
 {
@@ -239,6 +288,46 @@ function clearAllMyParticipations($id)
     }
 }
 
+
+ // get maximum game round for current game
+function getMaxGameRound($gameId){
+    global $conn;
+    $sql = "select max(round_number) as max_round from game_round where game_id = $gameId";
+    $result = $conn->query($sql);
+    if ($result->num_rows > 0) {
+        $row = $result->fetch_assoc();
+        return $row["max_round"];
+    } else {
+        error_log('Error: ' . $conn->error);
+        return false;
+    }
+
+}
+//switchto Day/ night for current game round    
+function switchDayNight($gameId, $roundNumber){
+    global $conn;
+    $sql = "select daynight from game_round where game_id = $gameId and round_number = $roundNumber";
+    $result = $conn->query($sql);
+    if ($result->num_rows > 0) {
+        $row = $result->fetch_assoc();
+        $daynight = $row["daynight"];
+        if ($daynight == "day"){
+            $daynight = "night";
+        } else {
+            $daynight = "day";
+        }
+        $sql = "insert into game_round (daynight, game_id, round_number) values ('$daynight',$gameId,$roundNumber)";
+        if ($conn->query($sql) === true) {
+            return true;
+        } else {
+            error_log('Error: ' . $conn->error);
+            return false;
+        }
+    } else {
+        error_log('Error: ' . $conn->error);
+        return false;
+    }
+}
 function leaveGame($userId, $gameId)
 {
     global $conn;
@@ -250,4 +339,3 @@ function leaveGame($userId, $gameId)
         return false;
     }
 }
-?>
